@@ -1,13 +1,45 @@
 name: Deploy Frontend
+
+### trigger condition ###
 on:
   push:
     branches:
       - master
-
+###  這個 jobs 定義了一個名為 build 的工作，且指定 GitHub Actions 使用最新的 Unbutu 作為運行環境
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      ### actions/checkout@v3 這樣才能複製你 Github 倉庫的程式碼到 CI/CD 環境中運行 ###
+      - uses: actions/checkout@v3
+      ### 使用 Dockerfile.dev 來構建名為 cygnetops/react-test 的 image  
       - run: docker build -t cygnetops/react-test -f Dockerfile.dev .
+      ### 運行剛剛構建的 image，並執行 npm test
+      ### -e CI=true 讓 npm test 以 CI 模式運行，防止 Jest 測試等待用戶輸入
+      ### CI 是持續集成的意思，因為 JEST 預設是交互模式 (會等待用戶輸入導致卡住)
+      ### 補充 : 要 npm test 預設都以 CI 模式的話，修改 package.json 的設定就好 
       - run: docker run -e CI=true cygnetops/react-test npm test
+      ### name 是給 step 一個可讀的名稱
+      - name: Generate deployment package ### 產生部屬的文件
+        ### 壓縮當前目錄下的所有文件，並生成名稱為 deploy.zip 的檔案，且忽略 .git 名稱相關的檔案  
+        run: zip -r deploy.zip . -x '*.git*'
+        ### 以下是部屬到 Elastic Beanstalk
+      - name: Deploy to EB
+        ### 使用 GitHub Action 的 einaregilsson/beanstalk-deploy 來部屬    
+        uses: einaregilsson/beanstalk-deploy@v18
+        with:
+          ### 以下是我們要使用特定 iam 使用者的訪問金鑰
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
+          ### EB 的應用程式名稱
+          application_name: Frontend
+          ### EB 的環境名稱
+          environment_name: Frontend-env
+          ### 存放部屬包的 S3 儲存桶名稱
+          existing_bucket_name: elasticbeanstalk-ap-southeast-2-650251717098
+          ### EB 環境所在的 AWS 區域
+          region: ap-southeast-2
+          ### 版本標籤設為當前的 Github 提交 SHA ，以確保版本控制
+          version_label: ${{ github.sha }}
+          ### 用來進行部屬的檔案
+          deployment_package: deploy.zip
