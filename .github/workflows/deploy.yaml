@@ -40,6 +40,6 @@ jobs:
           ### EB 環境所在的 AWS 區域
           region: ap-southeast-2
           ### 版本標籤設為當前的 Github 提交 SHA ，以確保版本控制
-          version_label: ${{ github.sha }}
+          version_label: ${{ github.sha }}--${{ github.run_number }}
           ### 用來進行部屬的檔案
           deployment_package: deploy.zip
